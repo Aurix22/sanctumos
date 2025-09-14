@@ -1,0 +1,61 @@
+module "sanctumos/userland/shell"
+
+/*
+ * Einfacher Shell-Interpreter
+ *
+ * Was? Dies ist die Benutzershell des Betriebssystems. Sie zeigt
+ * exemplarisch, wie ein Prozess im Userland mit dem Kernel
+ * interagieren kann. Die Shell liest Befehle (hier simuliert aus
+ * einer Liste) und führt entsprechende Funktionen aus. Sie
+ * demonstriert Dateizugriffe, Konsolenausgabe und das Senden
+ * einfacher Netzwerkpakete.
+ *
+ * Warum? Eine Shell ist ein wichtiges Werkzeug zur Interaktion
+ * mit einem Betriebssystem. Sie dient auch als Testfall, um die
+ * Kernel-APIs von SanctumOS zu prüfen. Durch die Simulation von
+ * Eingaben können wir deterministisch testen.
+ *
+ * Wieso? Da es keinen echten Input-Stream gibt, nutzen wir eine
+ * vorgefertigte Liste von Kommandos. Der Shell-Code zeigt
+ * beispielhaft, wie man Systemfunktionen wie Dateioperationen,
+ * Memory-Stats und Netzwerk nutzen kann.
+ */
+
+import "sanctumos/kernel/device"
+import "sanctumos/kernel/filesystem"
+import "sanctumos/kernel/network"
+import "sanctumos/kernel/quantum"
+import "sanctumos/kernel/ipc"
+import "sanctumos/kernel/scheduler"
+import "sanctumos/kernel/security"
+import "sanctumos/kernel/memory"
+
+fn print(text:String) {
+  let handle_opt = device.open_device("console")
+  if handle_opt != None {
+    let handle = handle_opt?
+    device.console_write(handle, text + "\n")
+  }
+}
+
+fn main() {
+  // Kommandos zum Abarbeiten
+  let cmds = [ "echo Hello, SanctumOS!", "mem", "qrng", "exit" ]
+  for cmd in cmds {
+    if cmd.startsWith("echo ") {
+      let msg = cmd.slice(5)
+      print(msg)
+    } else if cmd == "mem" {
+      // Speicherstatus ausgeben (vereinfachte Ausgabe)
+      print("Memory pages: " + len(memory.page_table))
+    } else if cmd == "qrng" {
+      let rand = quantum.random_bytes(8)
+      print("Random bytes: " + rand)
+    } else if cmd == "exit" {
+      print("Bye!")
+      break
+    } else {
+      print("Unknown command: " + cmd)
+    }
+  }
+}

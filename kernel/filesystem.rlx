@@ -1,0 +1,102 @@
+module "sanctumos/kernel/filesystem"
+
+/*
+ * SanctumFS – Minimales virtuelles Dateisystem
+ *
+ * Was? Dieses Modul implementiert ein einfaches Dateisystem. Es
+ * verwaltet Inodes (Metadaten), Verzeichnisse und Dateien im
+ * Speicher. Jeder Eintrag wird von Contracts abgesichert, damit
+ * keine ungültigen Pfade erzeugt oder gelesen werden können.
+ *
+ * Warum? In vielen Embedded‑Systemen oder IoT‑Geräten gibt es nur
+ * rudimentäre Dateisysteme. Unsere Variante zeigt, wie man ein
+ * solches System in einer Contracts‑Sprache abbildet und bei Bedarf
+ * an ein echtes Flash‑Dateisystem anbinden könnte.
+ *
+ * Wieso? Wir verwenden Maps für Verzeichnisse und eine einfache
+ * Struktur für Inodes. Der Fokus liegt auf Nachvollziehbarkeit
+ * und Fehlersicherheit, nicht auf Performance. Für
+ * Militär‑Anwendungen zählen Auditierbarkeit und Korrektheit mehr
+ * als Geschwindigkeit.
+ */
+
+struct Inode {
+  id: Int,
+  owner: Int,
+  perms: Int,
+  size: Int,
+  data: Bytes
+}
+
+struct DirEntry {
+  name: String,
+  inode_id: Int
+}
+
+var inode_table: Map<Int, Inode> = {}
+var dir_tree: Map<String, List<DirEntry>> = {}
+var next_inode: Int = 1
+
+fn mount_root() {
+  // Initialisiert das Wurzelverzeichnis
+  inode_table = {}
+  dir_tree = { "/": [] }
+  next_inode = 1
+  reflect { trace "fs_mount", { root: "/" } }
+}
+
+fn create_file(path:String, owner:Int, perms:Int) => Inode {
+  /*
+   * Erstellt eine Datei. Das path‑Argument muss in der Form
+   * "/dir/name" sein. Der parent‑Ordner muss existieren.
+   */
+  ethos {
+    require path.startsWith("/")
+    require path != "/"
+  }
+  let parts = path.split("/")
+  let fname = parts[-1]
+  let dir_path = "/" + "/".join(parts[1:-1])
+  // Prüfe Verzeichnis
+  ethos { require dir_path in dir_tree }
+  let inode_id = next_inode
+  next_inode += 1
+  let inode = Inode(id=inode_id, owner=owner, perms=perms, size=0, data="")
+  inode_table[inode_id] = inode
+  let entry = DirEntry(name=fname, inode_id=inode_id)
+  dir_tree[dir_path] = dir_tree[dir_path] + [entry]
+  reflect { trace "fs_create", { path: path, inode: inode_id } }
+  return inode
+}
+
+fn lookup(path:String) => Option<Inode> {
+  // Sucht nach einer Datei und gibt das Inode zurück
+  if path == "/" { return None }
+  let parts = path.split("/")
+  let fname = parts[-1]
+  let dir_path = "/" + "/".join(parts[1:-1])
+  if dir_path not in dir_tree { return None }
+  for entry in dir_tree[dir_path] {
+    if entry.name == fname {
+      return inode_table.get(entry.inode_id)
+    }
+  }
+  return None
+}
+
+fn read_file(path:String) => Bytes {
+  let inode_opt = lookup(path)
+  ethos { require inode_opt != None }
+  let inode = inode_opt?
+  return inode.data
+}
+
+fn write_file(path:String, data:Bytes) {
+  let inode_opt = lookup(path)
+  ethos { require inode_opt != None }
+  let inode = inode_opt?
+  inode.data = data
+  inode.size = len(data)
+  inode_table[inode.id] = inode
+  reflect { trace "fs_write", { path: path, size: len(data) } }
+}

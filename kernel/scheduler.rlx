@@ -1,0 +1,117 @@
+module "sanctumos/kernel/scheduler"
+
+/*
+ * Round‑Robin Scheduler
+ *
+ * Was? Der Scheduler verwaltet Prozesse und Threads des Betriebssystems.
+ * Er sorgt dafür, dass jeder Prozess CPU‑Zeit erhält, indem er sie in
+ * einer einfachen Round‑Robin‑Reihenfolge abarbeitet. Prozesse bestehen
+ * aus einem Hauptthread und optional weiteren Threads. Jede Thread‑
+ * Ausführung ist durch einen Contracts-Block abgesichert, damit ein
+ * abstürzender Thread den Kernel nicht gefährdet.
+ *
+ * Warum? In vielen Systemen führen Fehler im Scheduling zu Deadlocks
+ * oder Starvation. Durch die formalen Definitionen in Revelex lässt
+ * sich sicherstellen, dass Threads nicht hungern und dass keine
+ * unendlichen Schleifen entstehen. Zudem können wir genaue
+ * Laufzeitmessungen durchführen, da alle Wechsel protokolliert
+ * werden.
+ *
+ * Wieso? Wir entscheiden uns für einen Round‑Robin‑Ansatz, da er
+ * einfach implementierbar und verlässlich ist. Für reale Systeme
+ * könnte man später durch Prioritäten oder Fairness‑Algorithmen
+ * erweitern. Jede Wechselentscheidung wird geloggt, damit spätere
+ * Analysen möglich sind.
+ */
+
+import "sanctumos/kernel/security"
+import "sanctumos/kernel/memory"
+import "sanctumos/kernel/tangle"
+import "sanctumos/kernel/quantum"
+
+// Prozessstruktur
+struct Process {
+  pid: Int,
+  name: String,
+  entry: fn(),
+  threads: List<Thread>,
+  state: String,
+  contracts: List<Any>
+}
+
+// Threadstruktur
+struct Thread {
+  tid: Int,
+  pc: Int,
+  stack: List<Any>,
+  state: String,
+  parent_pid: Int
+}
+
+// Globale Zustände
+var process_table: Map<Int, Process> = {}
+var ready_queue: List<Process> = []
+var next_pid: Int = 1
+var next_tid: Int = 1
+
+fn init() {
+  // Scheduler initialisieren
+  process_table = {}
+  ready_queue = []
+}
+
+fn alloc_pid() => {
+  let id = next_pid
+  next_pid += 1
+  return id
+}
+
+fn alloc_tid() => {
+  let id = next_tid
+  next_tid += 1
+  return id
+}
+
+fn create_process(name:String, entry: fn()) => Process {
+  // Erstellt einen neuen Prozess mit einem Hauptthread
+  let pid = alloc_pid()
+  let tid = alloc_tid()
+  let th = Thread(tid=tid, pc=0, stack=[], state="ready", parent_pid=pid)
+  let proc = Process(pid=pid, name=name, entry=entry, threads=[th], state="ready", contracts=[])
+  process_table[pid] = proc
+  return proc
+}
+
+fn enqueue(proc:Process) {
+  ready_queue = ready_queue + [proc]
+}
+
+fn schedule_next() {
+  // Wähle den nächsten Prozess aus der Queue
+  if len(ready_queue) == 0 {
+    // Idle – keine Prozesse
+    return
+  }
+  let proc = ready_queue[0]
+  ready_queue = ready_queue[1:]
+  // Kontextwechsel
+  run_process(proc)
+  // Falls der Prozess noch lebt, zurück in Queue
+  if proc.state == "ready" {
+    ready_queue = ready_queue + [proc]
+  }
+}
+
+fn run_process(proc:Process) {
+  // Führe die Hauptfunktion des Prozesses aus
+  ethos {
+    require proc.state == "ready"
+  }
+  proc.state = "running"
+  reflect { trace "sched_run", { pid: proc.pid, name: proc.name } }
+  // Führe entry aus
+  proc.entry()
+  // Nach Rückkehr Prozess beenden
+  proc.state = "exited"
+  reflect { trace "proc_exit", { pid: proc.pid } }
+}

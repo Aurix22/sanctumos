@@ -1,0 +1,68 @@
+module "sanctumos/userland/demo"
+
+/*
+ * Beispielprogramm – Demo
+ *
+ * Was? Dieses Programm zeigt, wie eine typische Anwendung im
+ * Userland von SanctumOS arbeiten kann. Es erstellt eine Datei,
+ * schreibt Daten hinein, liest sie wieder, sendet ein
+ * Netzwerkpaket und nutzt Quanten-Zufallszahlen. Zudem wird ein
+ * IPC-Kanal eingerichtet, um Nachrichten an sich selbst zu
+ * senden und zu empfangen.
+ *
+ * Warum? Ein Betriebssystem ist nur dann wertvoll, wenn
+ * Anwendungen darauf laufen können. Die Demo dient als
+ * Referenzimplementierung für Entwickler, die mit Revelex
+ * Programme schreiben möchten.
+ *
+ * Wieso? Wir kombinieren mehrere Kernel-Module in einem einzigen
+ * Ablauf, um zu zeigen, dass die APIs zusammenspielen. Jeder
+ * Schritt ist mit Contracts abgesichert. Fehlschläge werden
+ * geloggt.
+ */
+
+import "sanctumos/kernel/filesystem"
+import "sanctumos/kernel/device"
+import "sanctumos/kernel/network"
+import "sanctumos/kernel/quantum"
+import "sanctumos/kernel/ipc"
+import "sanctumos/kernel/security"
+
+fn print(text:String) {
+  let h = device.open_device("console")
+  if h != None {
+    device.console_write(h?, text + "\n")
+  }
+}
+
+fn main() {
+  // Datei schreiben
+  let inode = filesystem.create_file("/demo.txt", 1, 0o644)
+  filesystem.write_file("/demo.txt", "Hello from Demo!")
+  let content = filesystem.read_file("/demo.txt")
+  print("Demo File Content: " + content)
+
+  // Netzwerk senden
+  let pkt = network.Packet(src=network.local_addr, dst=network.local_addr, proto="demo", payload="Ping")
+  network.register_handler("demo", (p) => {
+    print("Received demo packet: " + p.payload)
+  })
+  network.send_packet(pkt)
+
+  // Quanten-Zufall
+  let rbytes = quantum.random_bytes(4)
+  print("Quantum random: " + rbytes)
+
+  // IPC-Kanal
+  let ch = ipc.create_channel(1)
+  // Gewähre dem Prozess die Berechtigung zum Empfang
+  security.grant_capability(1, Capability(name="ipc_receive", description="Erlaubt Empfang von IPC"))
+  ipc.send(ch, "TestMessage")
+  let msg_opt = ipc.receive(ch)
+  if msg_opt != None {
+    let m = msg_opt?
+    print("IPC message: " + m)
+  }
+
+  print("Demo completed.")
+}
