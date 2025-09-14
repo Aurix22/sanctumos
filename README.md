@@ -6,8 +6,7 @@ Das Projekt ist in Module unter dem Namespace `sanctumos` gegliedert. Jede Datei
 
 ## Build-Hinweise
 
-Wenn Sie über einen Revelex‑Compiler verfügen, können Sie das System mit folgendem Kommando bauen:
-Da Revelex zur Zeit eine konzeptionelle Sprache ist, gibt es keinen binären Kernel in diesem Archiv. Die Dateien dienen als Spezifikation, wie ein solches System geschrieben sein könnte.
+Wenn Sie über einen Revelex‑Compiler verfügen, können Sie das System mit folgendem Kommando bauen:Da Revelex zur Zeit eine konzeptionelle Sprache ist, gibt es keinen binären Kernel in diesem Archiv. Die Dateien dienen als Spezifikation, wie ein solches System geschrieben sein könnte.
 
 ## Verzeichnisübersicht
 
