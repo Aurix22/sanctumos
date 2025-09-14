@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "revx:gen": "node tools/revx-gen.mjs",
+    "predev": "npm run revx:gen",
+    "prebuild": "npm run revx:gen"
   },
   "dependencies": {
     "framer-motion": "^11.18.2",
@@ -20,6 +23,7 @@
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^4.7.0",
     "typescript": "^5.9.2",
-    "vite": "^5.4.20"
+    "vite": "^5.4.20",
+    "yaml": "^2.8.1"
   }
 }
