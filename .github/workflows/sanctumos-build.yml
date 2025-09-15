@@ -1,0 +1,28 @@
+name: SanctumOS CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: ▶️ Run build.sh
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: 📦 Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanctumos
+          path: |
+            README.md
+            build.sh
+            kernel/**/*.rlx
+            userland/**/*.rlx
